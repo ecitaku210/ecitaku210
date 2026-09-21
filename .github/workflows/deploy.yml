@@ -1,0 +1,58 @@
+name: Build and deploy to GitHub Pages
+
+# A PWA can only be installed to a home screen over HTTPS — service workers
+# are blocked on plain http (localhost excepted). GitHub Pages gives that for
+# free, which is why deployment is wired up rather than left as an exercise.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it mid-publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        # Pages serves a project site from https://<user>.github.io/<repo>/,
+        # so every asset URL has to be prefixed with the repo name. Deriving
+        # it here keeps the app working if the repo is ever renamed.
+        run: npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
