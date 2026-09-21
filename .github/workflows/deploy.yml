@@ -27,6 +27,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
+          # Must satisfy the `engines` floor in package.json (>=22.12), which
+          # Vitest 5 sets. `22` resolves to the latest 22.x, which does.
           node-version: 22
           cache: npm
 

@@ -132,6 +132,9 @@ with `BASE_PATH=/` when serving from a domain root.
 
 ## Running it locally
 
+Needs **Node 22.12 or newer** (Vitest 5 sets that floor; it is enforced by
+`engines` in `package.json`).
+
 ```bash
 npm install
 npm run dev        # dev server
