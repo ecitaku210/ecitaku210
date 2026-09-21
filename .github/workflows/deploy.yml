@@ -13,6 +13,14 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Every action below is pinned to a major that runs on Node 24. The previous
+# majors ran on Node 20, which GitHub has deprecated: today that is only a
+# warning, but it turns into a hard failure once Node 20 leaves the runner
+# image — silently breaking the deploy on a date we do not control.
+#
+# upload-pages-artifact matters transitively as well: v3 wrapped
+# upload-artifact@v4 (Node 20), while v5 pins upload-artifact v7 (Node 24).
+
 permissions:
   contents: read
   pages: write
@@ -29,9 +37,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # Must satisfy the `engines` floor in package.json (>=22.12), which
           # Vitest 5 sets. `22` resolves to the latest 22.x, which does.
@@ -51,7 +59,7 @@ jobs:
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -67,4 +75,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
