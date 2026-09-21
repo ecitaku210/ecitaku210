@@ -7,6 +7,10 @@ name: Build and deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  # Without this, a pull request runs no checks at all and nothing stops a
+  # change with failing tests from being merged. PRs run the build job only;
+  # publishing is guarded below.
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -14,10 +18,12 @@ permissions:
   pages: write
   id-token: write
 
-# Let a running deploy finish rather than cancelling it mid-publish.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  # One run per branch or PR. Pushes to main still serialise, so two deploys
+  # can never race each other, while a new push to a PR cancels the test run
+  # it just superseded.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -50,6 +56,10 @@ jobs:
           path: dist
 
   deploy:
+    # A pull request must never publish to the live site — it would put
+    # unreviewed code on the URL the whole group has installed. PRs stop after
+    # the build job, which is the part that actually verifies anything.
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     environment:
