@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeSplit, equalParts, PERCENT_TOTAL } from './split'
+import { MAX_MINOR } from './money'
 import { rng } from './testkit'
 
 function shares(result: ReturnType<typeof computeSplit>) {
@@ -153,5 +154,47 @@ describe('computeSplit — rejections', () => {
     ])
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.message).toContain('twice')
+  })
+})
+
+describe('computeSplit — precision limits', () => {
+  it('refuses weights so large that the multiply leaves the exact-integer range', () => {
+    // amount * totalWeight here is ~9e21, far past 2^53. The sum would still
+    // come out right (the leftover pass hides it), but individual shares drift:
+    // two members whose weights differ by 1 in 9 billion ended up 55 minor
+    // units apart. Silently unfair is worse than refused.
+    const r = computeSplit(MAX_MINOR, 'shares', [
+      { memberId: 'a', weight: 90_000_000_000 },
+      { memberId: 'b', weight: 90_000_000_001 },
+    ])
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.message).toContain('too large')
+  })
+
+  it('still accepts the largest realistic trip', () => {
+    // 100 million major units, 20 people on 5 shares each.
+    const parts = Array.from({ length: 20 }, (_, i) => ({ memberId: `m${i}`, weight: 5 }))
+    const r = computeSplit(10_000_000_000, 'shares', parts)
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect([...r.shares.values()].reduce((a, b) => a + b, 0)).toBe(10_000_000_000)
+    }
+  })
+
+  it('accepts a percentage split at the largest amount the app allows', () => {
+    // MAX_MINOR is chosen so that MAX_MINOR * 10_000 basis points stays inside
+    // the exact-integer range. If someone raises one without the other, this
+    // is the test that catches it.
+    const r = computeSplit(MAX_MINOR, 'percent', [
+      { memberId: 'a', weight: 3333 },
+      { memberId: 'b', weight: 6667 },
+    ])
+    expect(r.ok).toBe(true)
+    if (r.ok) expect([...r.shares.values()].reduce((a, b) => a + b, 0)).toBe(MAX_MINOR)
+  })
+
+  it('refuses an amount above the supported maximum', () => {
+    const r = computeSplit(MAX_MINOR + 1, 'equal', equalParts(['a', 'b']))
+    expect(r.ok).toBe(false)
   })
 })

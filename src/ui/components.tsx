@@ -74,6 +74,29 @@ export function Money({
   return <span className={`money num${tone}`}>{formatMoney(amount, currency)}</span>
 }
 
+/**
+ * Shown when a route names a trip or expense this phone does not hold — after
+ * deleting it, or when a link arrives before the ledger it refers to. The
+ * screens used to render a bare title bar over a blank page, which reads as a
+ * crash rather than an explanation.
+ */
+export function NotFound({ what }: { what: 'trip' | 'expense' }) {
+  return (
+    <>
+      <TopBar title={what === 'trip' ? 'Trip not found' : 'Expense not found'} onBack />
+      <div className="content no-fab">
+        <Empty title={`That ${what} is not on this phone`}>
+          It was deleted here, or it lives on someone else&apos;s phone and you have not imported
+          their copy yet.
+        </Empty>
+        <button className="btn block" onClick={() => (window.location.hash = '/')}>
+          Back to trips
+        </button>
+      </div>
+    </>
+  )
+}
+
 export function Empty({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="empty">

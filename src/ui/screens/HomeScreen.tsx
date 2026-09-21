@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useStore, todayISO } from '../../storage/store'
+import { useStore } from '../../storage/store'
 import { computeTotals, liveExpenses, liveMembers } from '../../domain/balance'
 import { DEFAULT_CURRENCIES } from '../../domain/money'
 import { Empty, Field, Money, TopBar } from '../components'
@@ -52,8 +52,9 @@ export function HomeScreen() {
             <div className="card">
               {trips.map((trip) => {
                 const me = db.identities[trip.id]
-                const totals = computeTotals(trip)
-                const myNet = totals.balances.find((b) => b.memberId === me)?.netMinor ?? 0
+                const myBalance = me
+                  ? computeTotals(trip).balances.find((b) => b.memberId === me)
+                  : undefined
                 return (
                   <button
                     key={trip.id}
@@ -67,7 +68,16 @@ export function HomeScreen() {
                       </div>
                     </div>
                     <div className="amount">
-                      <Money amount={myNet} currency={trip.currency} signed />
+                      {/*
+                        A trip you imported has no "me" yet, and showing ₹0.00
+                        there would read as "you are square" when the truth is
+                        "nobody has told the app who you are".
+                      */}
+                      {myBalance ? (
+                        <Money amount={myBalance.netMinor} currency={trip.currency} signed />
+                      ) : (
+                        <span className="chip">who are you?</span>
+                      )}
                     </div>
                   </button>
                 )
@@ -168,5 +178,3 @@ function NewTripForm({
     </div>
   )
 }
-
-export { todayISO }

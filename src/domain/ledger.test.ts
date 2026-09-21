@@ -217,3 +217,45 @@ describe('parseLedger — untrusted input', () => {
     if (r.ok) expect(r.file.trips.t1!.name.length).toBeLessThanOrEqual(120)
   })
 })
+
+describe('parseLedger — date handling', () => {
+  const wrapTrip = (patch: Record<string, unknown>) => {
+    const t = makeTrip('t1', [makeMember('m1', 'Asha')])
+    t.expenses.e1 = makeExpense({ id: 'e1', paidBy: 'm1', parts: [{ memberId: 'm1', weight: 1 }] })
+    ;(t.expenses as Record<string, unknown>).e1 = { ...t.expenses.e1, ...patch }
+    return {
+      kind: 'tripsplit.ledger',
+      schema: SCHEMA_VERSION,
+      exportedAt: 1,
+      exportedBy: 'devA',
+      trips: { t1: t },
+    }
+  }
+
+  it.each([
+    ['2026-01-0199', 'a date with trailing junk'],
+    ['2026-02-30', 'a day that does not exist'],
+    ['2026-13-01', 'a month that does not exist'],
+    ['2026-00-10', 'month zero'],
+    ['26-01-01', 'a two-digit year'],
+    ['31/01/2026', 'the wrong format entirely'],
+  ])('rejects %s (%s) instead of silently repairing it', (date) => {
+    // The old code ran dates through a 10-character truncation, so
+    // "2026-01-0199" became "2026-01-01" and passed as valid.
+    const r = parseLedger(wrapTrip({ date }))
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.file.trips.t1!.expenses).toEqual({})
+  })
+
+  it('accepts a real leap day', () => {
+    const r = parseLedger(wrapTrip({ date: '2028-02-29' }))
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.file.trips.t1!.expenses.e1?.date).toBe('2028-02-29')
+  })
+
+  it('rejects a leap day in a non-leap year', () => {
+    const r = parseLedger(wrapTrip({ date: '2026-02-29' }))
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.file.trips.t1!.expenses).toEqual({})
+  })
+})

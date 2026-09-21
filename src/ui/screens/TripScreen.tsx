@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useStore, useTrip } from '../../storage/store'
 import { computeTotals, liveExpenses, liveMembers, liveSettlements } from '../../domain/balance'
 import { findProbableDuplicates } from '../../domain/merge'
-import { Avatar, Empty, Money, Segmented, TopBar, shortDate } from '../components'
+import { Avatar, Empty, Money, NotFound, Segmented, TopBar, shortDate } from '../components'
 import { navigate } from '../router'
 import type { Id, Trip } from '../../domain/types'
 
@@ -12,7 +12,7 @@ export function TripScreen({ tripId }: { tripId: Id }) {
   const trip = useTrip(tripId)
   const [tab, setTab] = useState<Tab>('expenses')
 
-  if (!trip) return <MissingTrip />
+  if (!trip) return <NotFound what="trip" />
 
   return (
     <>
@@ -38,6 +38,7 @@ export function TripScreen({ tripId }: { tripId: Id }) {
           />
         </div>
 
+        <IdentityPrompt trip={trip} />
         <Warnings trip={trip} />
 
         {tab === 'expenses' ? <ExpensesTab trip={trip} /> : <BalancesTab trip={trip} />}
@@ -64,22 +65,40 @@ export function TripScreen({ tripId }: { tripId: Id }) {
   )
 }
 
-function MissingTrip() {
+/**
+ * After importing a trip there is no way for the app to know which member the
+ * new phone belongs to. Left unasked, "Who paid?" silently defaults to
+ * whoever sorts first alphabetically, so expenses get logged against the
+ * wrong person — and the home screen shows a balance of zero. Asking once,
+ * up front, is the only honest fix.
+ */
+function IdentityPrompt({ trip }: { trip: Trip }) {
+  const { db, setMyself } = useStore()
+  const members = liveMembers(trip)
+  if (db.identities[trip.id] || members.length === 0) return null
+
   return (
-    <>
-      <TopBar title="Trip not found" onBack />
-      <div className="content">
-        <Empty title="That trip is gone">
-          It was deleted, or this link came from a phone whose data you have not imported yet.
-        </Empty>
+    <div className="section">
+      <div className="notice">
+        <strong>Which one of these is you?</strong> Until you say, expenses will default to the
+        wrong person and your balance will show as zero.
+        <div className="spacer" />
+        <select value="" onChange={(e) => e.target.value && setMyself(trip.id, e.target.value)}>
+          <option value="">Choose your name…</option>
+          {members.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
       </div>
-    </>
+    </div>
   )
 }
 
 /** Things the user must see: broken records and likely double entries. */
 function Warnings({ trip }: { trip: Trip }) {
-  const totals = computeTotals(trip)
+  const totals = useMemo(() => computeTotals(trip), [trip])
   const duplicates = useMemo(() => findProbableDuplicates(trip), [trip])
 
   if (totals.problems.length === 0 && duplicates.length === 0) return null
@@ -107,9 +126,9 @@ function Warnings({ trip }: { trip: Trip }) {
 }
 
 function ExpensesTab({ trip }: { trip: Trip }) {
-  const expenses = liveExpenses(trip)
-  const settlements = liveSettlements(trip)
-  const totals = computeTotals(trip)
+  const expenses = useMemo(() => liveExpenses(trip), [trip])
+  const settlements = useMemo(() => liveSettlements(trip), [trip])
+  const totals = useMemo(() => computeTotals(trip), [trip])
   const nameOf = (id: Id) => trip.members[id]?.name ?? 'Someone (removed)'
 
   if (expenses.length === 0 && settlements.length === 0) {
@@ -193,7 +212,7 @@ function ExpensesTab({ trip }: { trip: Trip }) {
 
 function BalancesTab({ trip }: { trip: Trip }) {
   const { db } = useStore()
-  const totals = computeTotals(trip)
+  const totals = useMemo(() => computeTotals(trip), [trip])
   const me = db.identities[trip.id]
   const settled = totals.balances.every((b) => b.netMinor === 0)
 
@@ -221,7 +240,10 @@ function BalancesTab({ trip }: { trip: Trip }) {
               <div className="grow">
                 <div className="title">
                   {member?.name ?? 'Someone (removed)'}
-                  {b.memberId === me && <span className="chip" style={{ marginLeft: 8 }}>you</span>}
+                  {b.memberId === me && <> <span className="chip tiny">you</span></>}
+                  {member?.deletedAt != null && (
+                    <> <span className="chip tiny">removed</span></>
+                  )}
                 </div>
                 <div className="meta">
                   {label} · paid <Money amount={b.paidMinor} currency={trip.currency} />, used{' '}

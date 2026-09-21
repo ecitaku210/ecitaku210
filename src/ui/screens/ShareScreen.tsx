@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useStore, useTrip } from '../../storage/store'
 import { buildLedgerFile, decodeLedger, encodeLedger, parseLedger } from '../../domain/ledger'
 import { liveExpenses } from '../../domain/balance'
-import { TopBar } from '../components'
+import { NotFound, TopBar } from '../components'
 import { navigate } from '../router'
 import type { Id } from '../../domain/types'
 import type { MergeSummary } from '../../domain/merge'
@@ -30,7 +30,7 @@ export function ShareScreen({ tripId }: { tripId: Id }) {
     return encodeLedger(buildLedgerFile({ [trip.id]: trip }, db.deviceId))
   }, [trip, db.deviceId])
 
-  if (!trip) return <TopBar title="Trip not found" onBack />
+  if (!trip) return <NotFound what="trip" />
 
   const fileName = `${slug(trip.name)}-${liveExpenses(trip).length}-expenses.tripsplit.json`
   const blob = () =>
@@ -108,7 +108,7 @@ export function ShareScreen({ tripId }: { tripId: Id }) {
   return (
     <>
       <TopBar title="Share / sync" subtitle={trip.name} onBack />
-      <div className="content">
+      <div className="content no-fab">
         <div className="section">
           <div className="notice">
             <strong>Send this to everyone, every evening.</strong> Sending the same update twice is

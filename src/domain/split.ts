@@ -35,7 +35,7 @@ export function computeSplit(
   parts: SplitPart[],
 ): SplitResult | SplitError {
   if (!isValidMinor(amountMinor)) {
-    return { ok: false, message: 'Amount is not a valid whole minor-unit value.' }
+    return { ok: false, message: 'That amount cannot be read as money.' }
   }
   if (amountMinor <= 0) {
     return { ok: false, message: 'Amount must be greater than zero.' }
@@ -65,7 +65,7 @@ export function computeSplit(
         ok: false,
         message:
           mode === 'percent'
-            ? 'Percentages must be whole numbers of basis points.'
+            ? 'Percentages can have at most two decimal places.'
             : 'Shares must be whole numbers, zero or more.',
       }
     }
@@ -74,6 +74,18 @@ export function computeSplit(
   const totalWeight = weights.reduce((a, b) => a + b, 0)
   if (totalWeight <= 0) {
     return { ok: false, message: 'At least one person needs a share above zero.' }
+  }
+  // `largestRemainder` computes `amountMinor * weight` before dividing. That
+  // product must stay inside the exact-integer range: past 2^53 JavaScript
+  // starts rounding, and the rounding is not uniform across members, so two
+  // people with near-identical weights silently receive visibly different
+  // shares. The sum would still come out right — the leftover pass hides it —
+  // which is exactly what makes it worth refusing outright.
+  if (amountMinor * totalWeight > Number.MAX_SAFE_INTEGER) {
+    return {
+      ok: false,
+      message: 'Those share numbers are too large to divide accurately. Use smaller ones.',
+    }
   }
   if (mode === 'percent' && totalWeight !== PERCENT_TOTAL) {
     return {
@@ -95,9 +107,15 @@ function exactSplit(amountMinor: Minor, parts: SplitPart[]): SplitResult | Split
     sum += p.weight
   }
   if (sum !== amountMinor) {
+    // Deliberately says only *that* it is wrong, not the raw figures: this
+    // layer has no currency and would otherwise print bare minor units. The
+    // editor shows a properly formatted running total instead.
     return {
       ok: false,
-      message: `Exact amounts add up to ${sum}, but the expense is ${amountMinor} (in minor units).`,
+      message:
+        sum < amountMinor
+          ? 'Those amounts add up to less than the expense.'
+          : 'Those amounts add up to more than the expense.',
     }
   }
   const shares = new Map<Id, Minor>()
@@ -121,7 +139,7 @@ function largestRemainder(
     return { memberId: p.memberId, base, remainder: numerator - base * totalWeight }
   })
 
-  let distributed = rows.reduce((a, r) => a + r.base, 0)
+  const distributed = rows.reduce((a, r) => a + r.base, 0)
   let leftover = amountMinor - distributed
 
   // Biggest fractional part first; UUID ascending on a tie, so every replica

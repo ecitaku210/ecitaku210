@@ -1,11 +1,20 @@
 import type { Currency, Minor } from './types'
 
 /**
- * Largest safe amount, in minor units. At 2 decimals that is ~90 trillion
- * major units — far beyond any trip, and far below Number.MAX_SAFE_INTEGER
- * (9.007e15) even after the `amount * weight` multiply inside splitting.
+ * Largest amount accepted, in minor units — one billion major units at 2
+ * decimals (₹100 crore), which no trip will ever approach.
+ *
+ * The value is not arbitrary. Splitting computes `amount * weight` before
+ * dividing, and a percentage split uses weights in basis points totalling
+ * 10,000. So the largest product the arithmetic can face is
+ * `MAX_MINOR * 10_000 = 1e15`, comfortably inside Number.MAX_SAFE_INTEGER
+ * (9.007e15) where integers are still exact.
+ *
+ * Raising this without raising that headroom would make the largest allowed
+ * amount impossible to split by percentage — the two limits have to move
+ * together.
  */
-export const MAX_MINOR = 1_000_000_000_000
+export const MAX_MINOR = 100_000_000_000
 
 export function isValidMinor(n: unknown): n is Minor {
   return (

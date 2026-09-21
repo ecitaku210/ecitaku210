@@ -28,6 +28,10 @@ hosting bill and no company holding your group's spending history.
 **Sync every evening, not just at the end of the trip.** It takes one tap, and
 sending the same update twice is completely harmless (see below).
 
+The first time you open a trip someone shared with you, the app asks **which
+person on the trip is you**. Answer it: until you do, the app cannot know whose
+balance to show you, and "Who paid?" has nothing sensible to pre-fill.
+
 ---
 
 ## How the sync actually works

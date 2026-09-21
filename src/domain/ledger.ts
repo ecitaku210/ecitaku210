@@ -48,6 +48,23 @@ function str(v: unknown, max = 500): string | null {
 }
 
 /**
+ * Dates are validated, never truncated. Routing them through `str(v, 10)`
+ * meant "2026-01-0199" was cut down to "2026-01-01" and then passed the
+ * format check — silently rewriting a corrupt value into a plausible one.
+ */
+function isoDate(v: unknown): string | null {
+  if (typeof v !== 'string' || !ISO_DATE.test(v)) return null
+  const [y, m, d] = v.split('-').map(Number)
+  if (!y || !m || !d || m < 1 || m > 12 || d < 1 || d > 31) return null
+  // Reject calendar impossibilities such as 2026-02-30.
+  const probe = new Date(Date.UTC(y, m - 1, d))
+  if (probe.getUTCFullYear() !== y || probe.getUTCMonth() !== m - 1 || probe.getUTCDate() !== d) {
+    return null
+  }
+  return v
+}
+
+/**
  * Ids become object keys (`trip.expenses[id] = record`). A record whose id is
  * `__proto__` would therefore reassign the map's prototype instead of adding
  * an entry — the record silently disappears from `Object.values` while its
@@ -104,7 +121,7 @@ function parseExpense(v: unknown): Expense | null {
   const eid = id(o.id)
   const description = str(o.description, 200)
   const paidBy = id(o.paidBy)
-  const date = str(o.date, 10)
+  const date = isoDate(o.date)
   const updatedAt = ts(o.updatedAt)
   const createdAt = ts(o.createdAt)
   const updatedBy = id(o.updatedBy)
@@ -112,7 +129,7 @@ function parseExpense(v: unknown): Expense | null {
   const note = str(o.note, 500) ?? ''
 
   if (eid === null || description === null || paidBy === null) return null
-  if (date === null || !ISO_DATE.test(date)) return null
+  if (date === null) return null
   if (updatedAt === null || createdAt === null || updatedBy === null) return null
   if (deletedAt === undefined) return null
   if (!isValidMinor(o.amountMinor) || (o.amountMinor as number) <= 0) return null
@@ -153,7 +170,7 @@ function parseSettlement(v: unknown): Settlement | null {
   const sid = id(o.id)
   const fromMember = id(o.fromMember)
   const toMember = id(o.toMember)
-  const date = str(o.date, 10)
+  const date = isoDate(o.date)
   const updatedAt = ts(o.updatedAt)
   const createdAt = ts(o.createdAt)
   const updatedBy = id(o.updatedBy)
@@ -161,7 +178,7 @@ function parseSettlement(v: unknown): Settlement | null {
   const note = str(o.note, 500) ?? ''
 
   if (sid === null || fromMember === null || toMember === null) return null
-  if (date === null || !ISO_DATE.test(date)) return null
+  if (date === null) return null
   if (updatedAt === null || createdAt === null || updatedBy === null) return null
   if (deletedAt === undefined) return null
   if (!isValidMinor(o.amountMinor) || (o.amountMinor as number) <= 0) return null

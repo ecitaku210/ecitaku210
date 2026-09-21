@@ -67,7 +67,7 @@ export function ImportScreen({ payload }: { payload: string | null }) {
   return (
     <>
       <TopBar title="Import a trip" onBack />
-      <div className="content">
+      <div className="content no-fab">
         <div className="section">
           <div className="notice">
             Importing <strong>merges</strong> into what you already have. It never overwrites your
